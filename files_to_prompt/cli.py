@@ -52,17 +52,18 @@ def add_line_numbers(content):
     return "\n".join(numbered_lines)
 
 
-def print_path(writer, path, content, cxml, markdown, line_numbers):
+def print_path(writer, path, content, cxml, markdown, line_numbers, show_filename):
     if cxml:
-        print_as_xml(writer, path, content, line_numbers)
+        print_as_xml(writer, path, content, line_numbers, show_filename)
     elif markdown:
-        print_as_markdown(writer, path, content, line_numbers)
+        print_as_markdown(writer, path, content, line_numbers, show_filename)
     else:
-        print_default(writer, path, content, line_numbers)
+        print_default(writer, path, content, line_numbers, show_filename)
 
 
-def print_default(writer, path, content, line_numbers):
-    writer(path)
+def print_default(writer, path, content, line_numbers, show_filename):
+    if show_filename:
+        writer(path)
     writer("---")
     if line_numbers:
         content = add_line_numbers(content)
@@ -71,10 +72,11 @@ def print_default(writer, path, content, line_numbers):
     writer("---")
 
 
-def print_as_xml(writer, path, content, line_numbers):
+def print_as_xml(writer, path, content, line_numbers, show_filename):
     global global_index
     writer(f'<document index="{global_index}">')
-    writer(f"<source>{path}</source>")
+    if show_filename:
+        writer(f"<source>{path}</source>")
     writer("<document_content>")
     if line_numbers:
         content = add_line_numbers(content)
@@ -84,13 +86,14 @@ def print_as_xml(writer, path, content, line_numbers):
     global_index += 1
 
 
-def print_as_markdown(writer, path, content, line_numbers):
+def print_as_markdown(writer, path, content, line_numbers, show_filename):
     lang = EXT_TO_LANG.get(path.split(".")[-1], "")
     # Figure out how many backticks to use
     backticks = "```"
     while backticks in content:
         backticks += "`"
-    writer(path)
+    if show_filename:
+        writer(path)
     writer(f"{backticks}{lang}")
     if line_numbers:
         content = add_line_numbers(content)
@@ -110,11 +113,12 @@ def process_path(
     claude_xml,
     markdown,
     line_numbers=False,
+    show_filename=False,
 ):
     if os.path.isfile(path):
         try:
             with open(path, "r") as f:
-                print_path(writer, path, f.read(), claude_xml, markdown, line_numbers)
+                print_path(writer, path, f.read(), claude_xml, markdown, line_numbers, show_filename)
         except UnicodeDecodeError:
             warning_message = f"Warning: Skipping file {path} due to UnicodeDecodeError"
             click.echo(click.style(warning_message, fg="red"), err=True)
@@ -164,6 +168,7 @@ def process_path(
                             claude_xml,
                             markdown,
                             line_numbers,
+                            show_filename,
                         )
                 except UnicodeDecodeError:
                     warning_message = (
@@ -244,6 +249,12 @@ def read_paths_from_stdin(use_null_separator):
     is_flag=True,
     help="Use NUL character as separator when reading from stdin",
 )
+@click.option(
+    "show_filename",
+    "--filename/--no-filename",
+    default=True,
+    help="Show or hide filename in the output (shown by default)",
+)
 @click.version_option()
 def cli(
     paths,
@@ -257,10 +268,11 @@ def cli(
     markdown,
     line_numbers,
     null,
+    show_filename,
 ):
     """
     Takes one or more paths to files or directories and outputs every file,
-    recursively, each one preceded with its filename like this:
+    recursively, each one preceded with its filename by default:
 
     \b
         path/to/file.py
@@ -271,15 +283,23 @@ def cli(
         ---
         ...
 
+    Use `--no-filename` to hide the filenames in the output.
+
     If the `--cxml` flag is provided, the output will be structured as follows:
 
     \b
         <documents>
-        <document path="path/to/file1.txt">
+        <document index="1">
+        <source>path/to/file1.txt</source>  <!-- Unless --no-filename is used -->
+        <document_content>
         Contents of file1.txt
+        </document_content>
         </document>
-        <document path="path/to/file2.txt">
+        <document index="2">
+        <source>path/to/file2.txt</source>  <!-- Unless --no-filename is used -->
+        <document_content>
         Contents of file2.txt
+        </document_content>
         </document>
         ...
         </documents>
@@ -327,6 +347,7 @@ def cli(
             claude_xml,
             markdown,
             line_numbers,
+            show_filename,
         )
     if claude_xml:
         writer("</documents>")

@@ -439,3 +439,66 @@ def test_markdown(tmpdir, option):
             "`````\n"
         )
         assert expected.strip() == actual.strip()
+
+
+@pytest.mark.parametrize(
+    "args,should_contain_filename",
+    [
+        ([], True),  # Default behavior (show filename)
+        (["--filename"], True),  # Explicit flag to show filename
+        (["--no-filename"], False),  # Explicit flag to hide filename
+    ],
+)
+def test_filename_option(tmpdir, args, should_contain_filename):
+    runner = CliRunner()
+    with tmpdir.as_cwd():
+        os.makedirs("test_dir")
+        with open("test_dir/file1.txt", "w") as f:
+            f.write("Contents of file1")
+
+        result = runner.invoke(cli, ["test_dir"] + args)
+        assert result.exit_code == 0
+
+        if should_contain_filename:
+            assert "test_dir/file1.txt" in result.output
+            assert "---" in result.output
+        else:
+            assert "test_dir/file1.txt" not in result.output
+            # The content should still be there
+            assert "Contents of file1" in result.output
+
+
+@pytest.mark.parametrize(
+    "args,should_contain_filename",
+    [
+        (["--cxml"], True),  # Default with CXML
+        (["--cxml", "--filename"], True),  # CXML with filename
+        (["--cxml", "--no-filename"], False),  # CXML without filename
+        (["--markdown"], True),  # Default with markdown
+        (["--markdown", "--filename"], True),  # Markdown with filename
+        (["--markdown", "--no-filename"], False),  # Markdown without filename
+    ],
+)
+def test_filename_option_with_formats(tmpdir, args, should_contain_filename):
+    runner = CliRunner()
+    with tmpdir.as_cwd():
+        os.makedirs("test_dir")
+        with open("test_dir/file1.txt", "w") as f:
+            f.write("Contents of file1")
+
+        result = runner.invoke(cli, ["test_dir"] + args)
+        assert result.exit_code == 0
+
+        if should_contain_filename:
+            if "--cxml" in args:
+                assert "<source>test_dir/file1.txt</source>" in result.output
+            else:
+                assert "test_dir/file1.txt" in result.output
+        else:
+            if "--cxml" in args:
+                assert "<source>test_dir/file1.txt</source>" not in result.output
+            else:
+                assert "test_dir/file1.txt" not in result.output
+
+        # The content should always be there
+        assert "Contents of file1" in result.output
