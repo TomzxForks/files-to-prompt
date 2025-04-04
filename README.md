@@ -92,6 +92,16 @@ This will output the contents of every file, with each file preceded by its rela
     ...
   ```
 
+- `--filename/--no-filename`: Control whether to show or hide filenames in the output (shown by default).
+
+  ```bash
+  # Hide filenames in the output
+  files-to-prompt path/to/directory --no-filename
+
+  # Explicitly show filenames (default behavior)
+  files-to-prompt path/to/directory --filename
+  ```
+
 - `-0/--null`: Use NUL character as separator when reading paths from stdin. Useful when filenames may contain spaces.
 
   ```bash
